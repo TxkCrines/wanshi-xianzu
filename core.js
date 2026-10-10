@@ -1689,7 +1689,7 @@ exports.EVENT_PACK=EVENT_PACK;
 const { Character, GameState, LifeEvent }=require('./GameState');
 function alphaDefaults() {
     return {
-        gameVersion: 'Alpha 0.1.2',
+        gameVersion: 'Alpha 0.3',
         herbs: 0,
         materials: 0,
         reputation: 100,
@@ -1812,7 +1812,7 @@ const REALMS = [
     'qi',
     'foundation',
     'core',
-    'nascent'
+    'nascent', 'spirit', 'void'
 ];
 
 exports.alphaDefaults=alphaDefaults;
@@ -2217,7 +2217,7 @@ const realms = [
     'qi',
     'foundation',
     'core',
-    'nascent'
+    'nascent', 'spirit', 'void'
 ];
 function highestRealmRepresentative(state) {
     const people = Object.values(state.characters.alive).filter((c)=>c.isResident && (!c.factionId || c.factionId === state.playerFamily.id));
@@ -2454,7 +2454,7 @@ class Engine {
             const previous = {
                 foundation: 'qi',
                 core: 'foundation',
-                nascent: 'core'
+                nascent: 'core', spirit: 'nascent', void: 'spirit'
             }[target];
             c.realm = previous;
             c.realmStage = CONFIG.stages[previous];
@@ -2698,9 +2698,9 @@ class AlphaWorldSystem {
     }
     upgrade(key) {
         const b = D.buildings[key], level = this.a.buildings[key];
-        if (!b || !level || level >= 4) return false;
+        if (!b || !level || level >= 6) return false;
         const next = b.levels[level + 1];
-        const max = key === 'spiritVein' ? Math.min(4, this.s.playerFamily.rank + 1) : this.s.playerFamily.rank;
+        const max = key === 'spiritVein' ? Math.min(6, this.s.playerFamily.rank + 1) : this.s.playerFamily.rank;
         if (level + 1 > max || this.a.poor || this.s.playerFamily.spiritStones < next.upgradeCost) return false;
         this.s.playerFamily.spiritStones -= next.upgradeCost;
         this.a.buildings[key]++;
@@ -2716,13 +2716,17 @@ class AlphaWorldSystem {
             '1-low',
             '1-mid',
             '2',
-            '3'
+            '3',
+            '4',
+            '5'
         ].indexOf(this.s.playerFamily.spiritVeinTier) >= [
             '1-low',
             '1-mid',
             '2',
-            '3'
-        ].indexOf(q.spiritVein) && (!q.foundation || counts('foundation') >= q.foundation) && (!q.core || counts('core') >= q.core) && (!q.nascent || counts('nascent') >= q.nascent) && (r === 2 || this.a.buildings.hall >= r - 1 && this.a.buildings.library >= r - 1);
+            '3',
+            '4',
+            '5'
+        ].indexOf(q.spiritVein) && (!q.foundation || counts('foundation') >= q.foundation) && (!q.core || counts('core') >= q.core) && (!q.nascent || counts('nascent') >= q.nascent) && (!q.spirit || counts('spirit') >= q.spirit) && (!q.void || counts('void') >= q.void) && (r === 2 || this.a.buildings.hall >= r - 1 && this.a.buildings.library >= r - 1);
     }
     promote() {
         if (!this.rankEligible()) return false;
@@ -3736,7 +3740,7 @@ class CultivationSystem {
         const order = [
             'foundation',
             'core',
-            'nascent'
+            'nascent', 'spirit', 'void'
         ];
         const rank = order.indexOf(this.target(c) || '');
         const candidates = playerMember(this.s, c) ? this.s.pendingDecisions.filter((d)=>d.type === 'major_breakthrough').map((d)=>this.s.characters.alive[d.characterId]) : Object.values(this.s.characters.alive).filter((p)=>p.factionId === c.factionId && p.isBottleneck && this.atMajor(p));
@@ -3787,10 +3791,10 @@ class CultivationSystem {
         return manualBreakthrough(this.s, c);
     }
     target(c) {
-        return c.realm === 'qi' ? 'foundation' : c.realm === 'foundation' ? 'core' : c.realm === 'core' ? 'nascent' : null;
+        return ({qi:'foundation',foundation:'core',core:'nascent',nascent:'spirit',spirit:'void'})[c.realm] || null;
     }
     atMajor(c) {
-        return c.realm !== 'mortal' && c.realm !== 'nascent' && c.realmStage === CONFIG.stages[c.realm];
+        return c.realm !== 'mortal' && c.realm !== 'void' && c.realmStage === CONFIG.stages[c.realm];
     }
     chance(c, pill = false) {
         const target = this.target(c);
@@ -3824,7 +3828,7 @@ class CultivationSystem {
         });
         for (const c of people || Object.values(this.s.characters.alive).filter((c)=>playerMember(this.s, c) && (!c.branchId || c.isResident))){
             if (c.lifeStatus !== 'alive' || this.s.alpha?.missing[c.id] !== undefined) continue;
-            if (!c.cultivationStarted || !c.rootTested || c.realm === 'mortal' || c.realm === 'nascent' && c.realmStage === 4 && c.cultivationProgress >= 1) continue;
+            if (!c.cultivationStarted || !c.rootTested || c.realm === 'mortal' || c.realm === 'void' && c.realmStage === 4 && c.cultivationProgress >= 1) continue;
             if (!c.isBottleneck) {
                 const root = CONFIG.rootSpeed[c.rootType], understanding = CONFIG.comprehension.find(([max])=>c.comprehension < max)[1], tech = CONFIG.techniques.find((t)=>t.id === c.techniqueId)?.speed || 1;
                 const ageFactor = c.age < 18 ? .85 : c.age / this.life.theoretical(c) > .78 ? .72 : 1;
@@ -3858,7 +3862,7 @@ class CultivationSystem {
                         ]);
                     }
                 } else this.attempt(c, false, true);
-            } else if (c.realm === 'nascent' && c.realmStage === 4) {
+            } else if (c.realm === 'void' && c.realmStage === 4) {
                 c.isBottleneck = false;
             } else if (this.rng.chance(CONFIG.minorChance)) {
                 c.realmStage++;
@@ -4771,13 +4775,13 @@ class LifespanSystem {
                 'qi',
                 'foundation',
                 'core',
-                'nascent'
+                'nascent', 'spirit', 'void'
             ].indexOf(b.realm) - [
                 'mortal',
                 'qi',
                 'foundation',
                 'core',
-                'nascent'
+                'nascent', 'spirit', 'void'
             ].indexOf(a.realm) || b.realmStage - a.realmStage || b.age - a.age);
         const c = list[0];
         this.s.playerFamily.leaderId = c?.id || null;
@@ -5033,7 +5037,7 @@ class NotificationSystem {
         });
         if (global && (!people[0]?.factionId || people[0].factionId === this.state.playerFamily.id) && (type !== 'death' || people[0]?.isWatched || [
             'core',
-            'nascent'
+            'nascent', 'spirit', 'void'
         ].includes(people[0]?.realm)) && [
             'death',
             'root_rare',
@@ -5095,8 +5099,8 @@ function validateState(s) {
             a.market.price,
             a.market.stock
         ])if (!finite(n) || n < 0) throw new Error('Alpha资源无效');
-        for (const n of Object.values(a.buildings))if (!Number.isInteger(n) || n < 1 || n > 4) throw new Error('建筑等级无效');
-        if (s.playerFamily.rank < 1 || s.playerFamily.rank > 4) throw new Error('家族星级无效');
+        for (const n of Object.values(a.buildings))if (!Number.isInteger(n) || n < 1 || n > 6) throw new Error('建筑等级无效');
+        if (s.playerFamily.rank < 1 || s.playerFamily.rank > 6) throw new Error('家族星级无效');
         const worldIds = new Set(a.world.map((f)=>f.id));
         if (worldIds.size !== a.world.length) throw new Error('势力ID冲突');
         for (const f of a.world){
@@ -5189,11 +5193,11 @@ class SaveSystem {
             ensureAlpha(raw);
             return raw;
         }
-        if (raw?.meta?.saveVersion === '1.2.1' || raw?.meta?.saveVersion === '1.2.0' || raw?.meta?.saveVersion === '1.1.0') {
+        if (raw?.meta?.saveVersion === '1.2.2' || raw?.meta?.saveVersion === '1.2.1' || raw?.meta?.saveVersion === '1.2.0' || raw?.meta?.saveVersion === '1.1.0') {
             const s = JSON.parse(JSON.stringify(raw));
             s.meta.saveVersion = CONFIG.saveVersion;
             ensureAlpha(s);
-            if (raw.meta.saveVersion !== '1.2.1') compactLegacyHistory(s);
+            if (!['1.2.1','1.2.2'].includes(raw.meta.saveVersion)) compactLegacyHistory(s);
             validateState(s);
             return s;
         }
@@ -5429,7 +5433,7 @@ class TimeSystem {
     advanceMonths(months) {
         if (!Number.isFinite(months) || months < 0) throw new Error('Invalid month count');
         for(let i = 0; i < Math.floor(months); i++){
-            if (this.s.alpha?.worldModal) break;
+            if (this.s.alpha?.worldModal || this.s.pendingDecisions.length) break;
             this.tick();
         }
     }
@@ -5653,7 +5657,7 @@ function alphaRows(p) {
         ...Object.entries(D.buildings).map(([k, b])=>({
                 title: b.name + ' · ' + a.buildings[k] + '级',
                 body: `下一级灵石 ${b.levels[a.buildings[k] + 1]?.upgradeCost ?? '已至最高'}${k === 'spiritVein' ? ' · ' + spiritVein(s.playerFamily.spiritVeinTier) : ''}`,
-                actions: a.buildings[k] < 4 ? [
+                actions: a.buildings[k] < 6 ? [
                     {
                         title: '升级',
                         id: 'upgrade:' + k
@@ -6190,7 +6194,7 @@ function alphaRows(p) {
             }),
             {
                 title: '天下修行',
-                body: `开局零元婴，第一元婴必须从实际修炼突破产生。\n${a.firstNascent ? `${a.firstNascent.year}年 ${a.firstNascent.name}成为第一元婴` : '尚无元婴现世'}\n五星及以上尚未开放。`
+                body: `开局零元婴，第一元婴必须从实际修炼突破产生。\n${a.firstNascent ? `${a.firstNascent.year}年 ${a.firstNascent.name}成为第一元婴` : '尚无元婴现世'}\n化神与炼虚已开放；元婴修士可开辟玄天界。`
             }
         ];
     }
@@ -6316,7 +6320,7 @@ class AudioManager {
     constructor(port = {
         async play (path, loop, volume) {
             if (typeof Audio === 'undefined') return null;
-            const audio = new Audio(path + (loop ? '.mp3' : '.wav'));
+            const audio = new Audio(path + (path.startsWith('audio/v3/') ? '.wav' : loop ? '.mp3' : '.wav'));
             audio.loop = loop;
             audio.volume = volume;
             audio.preload = 'auto';
@@ -6464,7 +6468,7 @@ const LABELS = {
     qi: '练气',
     foundation: '筑基',
     core: '金丹',
-    nascent: '元婴',
+    nascent: '元婴', spirit: '化神', void: '炼虚',
     none: '无灵根',
     five: '五灵根',
     four: '四灵根',
@@ -6522,7 +6526,7 @@ class PresentationQueue {
         return this.items[0];
     }
     get paused() {
-        return this.active?.kind === 'important' || this.active?.kind === 'world';
+        return !!this.active;
     }
     push(input) {
         if (this.seen.has(input.key)) return;
@@ -6629,14 +6633,22 @@ class Presenter {
         this.detach = e.bus.subscribe((event)=>{
             if (!e.state.meta.started) return;
             const c = findCharacter(e.state, event.characterId), w = e.world;
+            if (event.type === 'birth' && c && c.age > 0) return;
+            if (c && (!c.isResident || !c.isFamily) && ['root_test','root_rare','minor_success','minor_failure'].includes(event.type)) return;
             if (c && c.factionId && c.factionId !== e.state.playerFamily.id && !playerMember(e.state, c) && event.type !== 'WORLD_FIRST_NASCENT_SOUL') return;
+            if (['birth','death','marriage','major_success','root_rare','rank','exploration'].includes(event.type)) this.dirtySave = true;
+            const watched = !!c && (c.isWatched || c.id === e.state.playerFamily.leaderId);
+            if (['minor_success','minor_failure','root_test','arrival'].includes(event.type) && c && !watched) return;
+            if (event.type === 'birth' && c && !watched && !findCharacter(e.state,c.fatherId)?.isWatched && !findCharacter(e.state,c.motherId)?.isWatched) return;
+            if (event.type === 'marriage' && c && !watched && !this.currentAction.startsWith('resolve:') && !c.spouseIds.some(id=>findCharacter(e.state,id)?.isWatched)) return;
+            if (event.type === 'death' && c && !watched && !['core','nascent','spirit','void'].includes(c.realm)) return;
             if (event.type === 'diplomacy' && this.currentAction.startsWith('diplomacy:')) return;
             if (event.type === 'WORLD_FIRST_NASCENT_SOUL' || event.type === 'major_success' && w.a.worldModal) {
                 this.dirtySave = true;
                 return;
             }
             const template = w.events.templates.find((x)=>'event:' + x.id === event.type);
-            const importantDeath = event.type === 'death' && !!c && (c.isWatched || c.id === e.state.playerFamily.leaderId || c.realm === 'core' || c.realm === 'nascent');
+            const importantDeath = event.type === 'death' && !!c && (c.isWatched || c.id === e.state.playerFamily.leaderId || ['core','nascent','spirit','void'].includes(c.realm));
             const important = importantDeath || [
                 'major_success',
                 'root_rare',
@@ -6704,7 +6716,8 @@ class Presenter {
                     building: '山门营建',
                     choice: '议事结果',
                     policy: '家策调整',
-                    deferred: '突破暂缓'
+                    deferred: '突破暂缓',
+                    arrival: '新客入族'
                 })[event.type] || '族中消息',
                 body,
                 kind: event.type === 'rank' && e.state.playerFamily.rank === 4 ? 'world' : important ? 'important' : card ? 'card' : 'toast',
@@ -7135,7 +7148,9 @@ class Presenter {
             stones: beforeEngine.state.playerFamily.spiritStones,
             herbs: beforeEngine.world.a.herbs,
             materials: beforeEngine.world.a.materials,
-            pills: beforeEngine.world.a.inventory.foundationPill
+            pills: beforeEngine.world.a.inventory.foundationPill,
+            spiritPills: beforeEngine.state.frontier?.bag.spiritPill || 0,
+            voidPills: beforeEngine.state.frontier?.bag.voidPill || 0
         } : null;
         this.currentAction = id;
         try {
@@ -7388,6 +7403,16 @@ class Presenter {
                         '筑基丹',
                         before.pills,
                         a.inventory.foundationPill
+                    ],
+                    [
+                        '化神丹',
+                        before.spiritPills,
+                        e.state.frontier?.bag.spiritPill || 0
+                    ],
+                    [
+                        '炼虚丹',
+                        before.voidPills,
+                        e.state.frontier?.bag.voidPill || 0
                     ]
                 ];
                 const delta = changes.filter(([, b, n])=>b !== n).map(([name, b, n])=>name + ' ' + Math.floor(b) + ' → ' + Math.floor(n) + '（' + (n - b > 0 ? '+' : '') + Math.round(n - b) + '）').join('\n');
@@ -7765,7 +7790,7 @@ class Presenter {
                     'qi',
                     'foundation',
                     'core',
-                    'nascent'
+                    'nascent', 'spirit', 'void'
                 ].map((r)=>`${label(r)} ${alive.filter((x)=>x.realm === r).length}`).join('  ')
             },
             {
@@ -8138,7 +8163,8 @@ function spiritVein(tier) {
         '1-mid': '一阶中品灵脉',
         '2': '二阶灵脉',
         '3': '三阶灵脉',
-        '4': '四阶灵脉'
+        '4': '四阶灵脉',
+        '5': '五阶灵脉'
     })[tier] || '灵脉待考';
 }
 function relation(n) {

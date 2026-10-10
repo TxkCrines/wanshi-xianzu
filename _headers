@@ -8,3 +8,15 @@
   Cache-Control: no-cache
 /style.css
   Cache-Control: no-cache
+/experience.css
+  Cache-Control: no-cache
+/experience.js
+  Cache-Control: no-cache
+/expansion.js
+  Cache-Control: no-cache
+/frontier.js
+  Cache-Control: no-cache
+/mature-ui.js
+  Cache-Control: no-cache
+/game-ui.css
+  Cache-Control: no-cache
