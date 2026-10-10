@@ -1,0 +1,7 @@
+{
+  "name":"wanshi-xianzu",
+  "version":"0.3.0",
+  "private":true,
+  "description":"万世仙族 · 玄天纪",
+  "scripts":{"test":"node tests/expansion.test.cjs && node tests/frontier.test.cjs","build":"node scripts/build-static.cjs","check":"node --check core.js && node --check app.js && node --check experience.js && node --check expansion.js && node --check frontier.js && node --check mature-ui.js"}
+}
